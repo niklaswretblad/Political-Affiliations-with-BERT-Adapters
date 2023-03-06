@@ -2,6 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 from torch.utils.data import Dataset
+import json
+
 
 class SNLIDataset(Dataset):
 
@@ -13,9 +15,20 @@ class SNLIDataset(Dataset):
             for i, line in enumerate(source):
                 if max_size and i >= max_size:
                     break
-                sentence1, sentence2, gold_label = line.rstrip().split('\t')
-                self.xs.append((sentence1, sentence2))
-                self.ys.append(['contradiction', 'entailment', 'neutral'].index(gold_label))
+                data = json.loads(line)
+                sentence = data['headline']
+                label = data['category']
+
+                self.xs.append(sentence)
+                self.ys.append(['POLITICS', 'WELLNESS', 'ENTERTAINMENT', 'TRAVEL', 'STYLE & BEAUTY',
+                'PARENTING', 'HEALTHY LIVING', 'QUEER VOICES', 'FOOD & DRINK', 'BUSINESS', 'CRIME',
+                'COMEDY', 'SPORTS', 'BLACK VOICES', 'HOME & LIVING', 'PARENTS', 'WORLD NEWS', 'SCIENCE',
+                'U.S. NEWS', 'CULTURE & ARTS', 'TECH', 'WEIRD NEWS', 'ENVIRONMENT', 'EDUCATION', 'MEDIA', 
+                'WOMEN', 'MONEY', 'RELIGION', 'LATINO VOICES', 'IMPACT', 'WEDDINGS', 'COLLEGE',
+                'ARTS & CULTURE', 'STYLE', 'GREEN', 'TASTE', 'THE WORLDPOST', 'GOOD NEWS',
+                'WORLDPOST', 'FIFTY', 'ARTS'].index(label))
+                # print('xs: ', self.xs[i])
+                # print('ys: ', self.ys[i])
 
     def __getitem__(self, idx):
         return self.xs[idx], self.ys[idx]
@@ -23,13 +36,19 @@ class SNLIDataset(Dataset):
     def __len__(self):
         return len(self.xs)
 
-def BERT(device, train_dataset, test_dataset):
+def BERT(device, train_dataset, test_dataset, freeze_bert=False):
     # Instantiate the tokenizer and the model
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=3).to(device)
+    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=41).to(device)
+    
+    # Freeze the BERT model if required
+    if freeze_bert:
+        # Freeze all the parameters of the BERT model
+        for param in model.base_model.parameters():
+            param.requires_grad = False
 
     # Define the optimizer and the loss function
-    optimizer = AdamW(model.parameters(), lr=1e-5)
+    optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-5)
 
     # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
@@ -39,9 +58,9 @@ def BERT(device, train_dataset, test_dataset):
     model.train()
 
     for epoch in range(1):
-        for batch_idx, ((s1, s2), label) in enumerate(train_loader):
+        for batch_idx, (sent, label) in enumerate(train_loader):
             # Convert the data to tensor form
-            inputs = tokenizer(s1, s2, padding=True, truncation=True, return_tensors='pt').to(device)
+            inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
             labels = torch.tensor(label).to(device)
 
             # Forward pass
@@ -59,9 +78,9 @@ def BERT(device, train_dataset, test_dataset):
     with torch.no_grad():
         correct = 0
         total = 0
-        for (s1, s2), label in test_loader:
+        for sent, label in test_loader:
             # Convert the data to tensor form
-            inputs = tokenizer(s1, s2, padding=True, truncation=True, return_tensors='pt').to(device)
+            inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
             labels = torch.tensor(label).to(device)
             # Compute the predicted labels
             outputs = model(**inputs)
@@ -74,9 +93,18 @@ def BERT(device, train_dataset, test_dataset):
 
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    train_dataset = SNLIDataset('snli_1.0_train_preprocessed.txt', max_size=40000)
-    test_dataset = SNLIDataset('snli_1.0_test_preprocessed.txt')
-    BERT(device, train_dataset, test_dataset)
+    train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=50000)
+    test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=5000)
+    BERT(device, train_dataset, test_dataset, freeze_bert=True)
 
 if __name__ == '__main__':
     main()
+
+"""
+|Training samples | Test samples | Time | Accuracy | Freeze |
+|-----------------------------------------------------------| 
+|    2000         |  500         |   ?  |  43.80%  | False  |
+|    10 000       |  2000        |   ?  |  66.50%  | False  |
+|    10 000       |  2000        |   ?  |  25.50%  | True   |
+|    50 000       |  5000        |   ?  |  38.04%  | True   |
+"""
