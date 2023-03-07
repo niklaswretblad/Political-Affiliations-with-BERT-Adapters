@@ -5,28 +5,28 @@ from bs4 import BeautifulSoup
 from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained('KB/bert-base-swedish-cased')
-
-# Set the path to the folder containing the JSON files
 folder_path = 'all_speeches'
 
 
-def dataLoad():
+def compile_speeches():
 
     # Iterate over each file in the folder
     count = 0
     speech_dict = {}
     for filename in os.listdir(folder_path):
-        # type(os.listdir(folder_path))
+        
         print('Number ', count, ' of ', len(os.listdir(folder_path)))
+
         file_path = os.path.join(folder_path, filename)
         if os.path.isfile(file_path) and file_path.endswith('.json'):
+
             # If the file is a JSON file, load the data
             with open(file_path, 'r') as f:
                 json_data = json.load(f)
             
             speech = json_data['anforande']['anforandetext']
 
-            ## HTML parser
+            ## Text contains a lot of left over HTML code, so remove it
             soup = BeautifulSoup(speech, 'html.parser')
             text = soup.get_text()
             
@@ -57,4 +57,4 @@ def dataLoad():
     with open("preprocessed_speeches.JSON", "w", encoding="utf-8") as f:
         f.write(json_string)
 
-dataLoad()
+compile_speeches()
