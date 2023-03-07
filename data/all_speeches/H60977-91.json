@@ -1,0 +1,22 @@
+{
+  "anforande": {
+    "dok_hangar_id": "5031376",
+    "dok_id": "H60977",
+    "dok_titel": "Protokoll 2018/19:77 Torsdagen den 11 april",
+    "dok_rm": "2018/19",
+    "dok_nummer": "77",
+    "dok_datum": "2019-04-11 00:00:00",
+    "avsnittsrubrik": "Frågestund",
+    "underrubrik": "Automatiserad positionering vid larmsamtal",
+    "kammaraktivitet": "frågestund",
+    "anforande_id": "27d6f22d-016d-e911-911b-901b0eac4c78",
+    "anforande_nummer": "91",
+    "talare": "Heléne Björklund (S)",
+    "parti": "S",
+    "anforandetext": "<p>Fru talman! Min fråga går till inrikesminister Mikael Damberg. </p><p>Vid en nödsituation är det viktigt att polis, räddningstjänst och ambulans snabbt kan vara på plats för att påbörja en hjälpinsats. SOS Alarm har i dag ett trubbigt verktyg och begränsade möjligheter att exakt lokalisera människor som inte själva kan uppge var de befinner sig. </p><p>Det finns ett nytt system som kallas AML, där man kan få en automatisk gps-positionering. För mig är det självklart att denna ska kunna användas. </p><p> STYLEREF Kantrubrik \\* MERGEFORMAT Frågestund</p><p>Nu verkar det vara ett oklart rättsläge i Sverige avseende denna kommunikation och integritet som gör att en ny lagstiftning kan behövas. </p><p>Min fråga till statsrådet lyder därför: Hur ser ministern på den fortsatta utvecklingen av automatiserad positionering när man ringer 112?</p>",
+    "intressent_id": "0926214745119",
+    "rel_dok_id": "H6C120190411fs",
+    "replik": "N",
+    "systemdatum": "2019-05-02 19:39:44"
+  }
+}
