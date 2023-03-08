@@ -44,7 +44,7 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
 
     model = BertAdapterModel.from_pretrained(
         'bert-base-uncased'
-    ).to(device)
+    )
     model.add_classification_head('classification', num_labels=42)
     
     # Freeze the BERT model if required
@@ -54,7 +54,7 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             param.requires_grad = False
 
     # Define the optimizer and the loss function
-    #optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.named_parameters(), lr=1e-4)
 
     # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
@@ -70,8 +70,10 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
 
     model.set_active_adapters(task_name)
 
+    model.to(device)
+
     # Train the model
-    #model.train()
+    model.train()
 
     for epoch in range(1):
         for batch_idx, (sent, label) in enumerate(train_loader):
@@ -83,9 +85,9 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             outputs = model(**inputs, labels=labels)
             loss = outputs.loss
             # Backward pass
-            #optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            #optimizer.step()
+            optimizer.step()
             if batch_idx % 100 == 0:
                 print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}')
 
@@ -110,7 +112,7 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=20000)
-    test_dataset = SNLIDataset('News_Category_Dataset_v3_test.json', max_size=1000)
+    test_dataset = SNLIDataset('News_Category_Dataset_v3_test.json', max_size=2000)
     BERT(device, train_dataset, test_dataset, freeze_bert=False)
 
 if __name__ == '__main__':
