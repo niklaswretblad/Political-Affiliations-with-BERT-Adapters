@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from transformers.adapters import PfeifferConfig, BertAdapterModel
 from torch.utils.data import Dataset
 import json
 
@@ -26,7 +27,7 @@ class SNLIDataset(Dataset):
                 'U.S. NEWS', 'CULTURE & ARTS', 'TECH', 'WEIRD NEWS', 'ENVIRONMENT', 'EDUCATION', 'MEDIA', 
                 'WOMEN', 'MONEY', 'RELIGION', 'LATINO VOICES', 'IMPACT', 'WEDDINGS', 'COLLEGE',
                 'ARTS & CULTURE', 'STYLE', 'GREEN', 'TASTE', 'THE WORLDPOST', 'GOOD NEWS',
-                'WORLDPOST', 'FIFTY', 'ARTS'].index(label))
+                'WORLDPOST', 'FIFTY', 'ARTS', 'DIVORCE'].index(label))
                 # print('xs: ', self.xs[i])
                 # print('ys: ', self.ys[i])
 
@@ -39,7 +40,12 @@ class SNLIDataset(Dataset):
 def BERT(device, train_dataset, test_dataset, freeze_bert=False):
     # Instantiate the tokenizer and the model
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=41).to(device)
+    #model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=42).to(device)
+
+    model = BertAdapterModel.from_pretrained(
+        'bert-base-uncased'
+    ).to(device)
+    model.add_classification_head('classification', num_labels=42)
     
     # Freeze the BERT model if required
     if freeze_bert:
@@ -48,14 +54,24 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             param.requires_grad = False
 
     # Define the optimizer and the loss function
-    optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-5)
+    #optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-4)
 
     # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32)
 
+    task_name = "adapter"
+    # resolve the adapter config
+    adapter_config = PfeifferConfig()
+    # add a new adapter
+    model.add_adapter(task_name, config=adapter_config)
+    # Enable adapter training
+    model.train_adapter(task_name)
+
+    model.set_active_adapters(task_name)
+
     # Train the model
-    model.train()
+    #model.train()
 
     for epoch in range(1):
         for batch_idx, (sent, label) in enumerate(train_loader):
@@ -67,9 +83,9 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             outputs = model(**inputs, labels=labels)
             loss = outputs.loss
             # Backward pass
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            #optimizer.step()
             if batch_idx % 100 == 0:
                 print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}')
 
@@ -93,9 +109,9 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
 
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=50000)
-    test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=5000)
-    BERT(device, train_dataset, test_dataset, freeze_bert=True)
+    train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=20000)
+    test_dataset = SNLIDataset('News_Category_Dataset_v3_test.json', max_size=1000)
+    BERT(device, train_dataset, test_dataset, freeze_bert=False)
 
 if __name__ == '__main__':
     main()
