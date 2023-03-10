@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW, AutoConfig
 from transformers.adapters import PfeifferConfig, BertAdapterModel
 from torch.utils.data import Dataset
 import json
@@ -42,8 +42,14 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     #model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=42).to(device)
 
+    config = AutoConfig.from_pretrained(
+        "bert-base-uncased",
+        num_labels=42,
+    )
+
     model = BertAdapterModel.from_pretrained(
-        'bert-base-uncased'
+        'bert-base-uncased',
+        config = config
     )
     model.add_classification_head('classification', num_labels=42)
     
