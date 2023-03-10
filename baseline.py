@@ -1,8 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW, AutoConfig
-from transformers.adapters import PfeifferConfig, BertAdapterModel
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW, AutoConfig, Trainer, TrainingArguments, default_data_collator
+from transformers.adapters import PfeifferConfig, BertAdapterModel, setup_adapter_training, AdapterArguments, AdapterTrainer
 from torch.utils.data import Dataset
+#import evaluate
 import json
 
 
@@ -49,7 +50,7 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
 
     model = BertAdapterModel.from_pretrained(
         'bert-base-uncased',
-        config = config
+        config = config,
     )
     model.add_classification_head('classification', num_labels=42)
     
@@ -60,42 +61,90 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             param.requires_grad = False
 
     # Define the optimizer and the loss function
-    optimizer = torch.optim.AdamW(model.named_parameters(), lr=1e-4)
+    #optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-4)
+
+    #metric = evaluate.load("accuracy")
 
     # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32)
 
-    task_name = "adapter"
-    # resolve the adapter config
-    adapter_config = PfeifferConfig()
-    # add a new adapter
-    model.add_adapter(task_name, config=adapter_config)
-    # Enable adapter training
-    model.train_adapter(task_name)
+    adapter_args = AdapterArguments()
+    adapter_args.train_adapter = True
+    adapter_args.adapter_config = "pfeiffer"
 
-    model.set_active_adapters(task_name)
+    setup_adapter_training(model, adapter_args, adapter_name = "classification")
+
+    #task_name = "adapter"
+    # resolve the adapter config
+    #adapter_config = PfeifferConfig()
+    # add a new adapter
+    #model.add_adapter(task_name, config=adapter_config)
+    # Enable adapter training
+    #model.train_adapter(task_name)
+
+    training_args = TrainingArguments(output_dir = "/tmp/bert",
+    #training_args = training_args(
+        do_train = True,
+        do_eval = False,
+        #max_seq_length = 512,
+        learning_rate = 1e-4,
+        num_train_epochs = 1,
+    )
+
+    trainer_class = AdapterTrainer if adapter_args.train_adapter else Trainer
+    trainer = trainer_class(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=test_dataset if training_args.do_eval else None,
+        #compute_metrics=compute_metrics,
+        tokenizer=tokenizer,
+        data_collator=default_data_collator,
+    )
+
+    #model.set_active_adapters(task_name)
 
     model.to(device)
 
     # Train the model
-    model.train()
 
-    for epoch in range(1):
-        for batch_idx, (sent, label) in enumerate(train_loader):
-            # Convert the data to tensor form
-            inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
-            labels = torch.tensor(label).to(device)
+    if training_args.do_train:
+        #checkpoint = None
+        #if training_args.resume_from_checkpoint is not None:
+        #    checkpoint = training_args.resume_from_checkpoint
+        #elif last_checkpoint is not None:
+        #    checkpoint = last_checkpoint
+        train_result = trainer.train()
+        #metrics = train_result.metrics
+        #max_train_samples = (
+        #    data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+        #)
+        #metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
-            # Forward pass
-            outputs = model(**inputs, labels=labels)
-            loss = outputs.loss
-            # Backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            if batch_idx % 100 == 0:
-                print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}')
+        #trainer.save_model()  # Saves the tokenizer too for easy upload
+
+        #trainer.log_metrics("train", metrics)
+        #trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    #model.train()
+
+    #for epoch in range(1):
+    #    for batch_idx, (sent, label) in enumerate(train_loader):
+    #        # Convert the data to tensor form
+    #        inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
+    #        labels = torch.tensor(label).to(device)
+    #
+    #        # Forward pass
+    #        outputs = model(**inputs, labels=labels)
+    #        loss = outputs.loss
+    #        # Backward pass
+    #        optimizer.zero_grad()
+    #        loss.backward()
+    #        optimizer.step()
+    #        if batch_idx % 100 == 0:
+    #            print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}')
 
     # Evaluate the model
     model.eval()
