@@ -83,9 +83,13 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
     # task == 1: freeze bert model weights
     if task == 1:
         # Freeze all the parameters of the BERT model
-        for param in model.base_model.parameters():
+        for param in model.bert.parameters():
             param.requires_grad = False
         model.classifier.requires_grad = True
+        model.to(device)
+        # Define the data loaders
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32)
 
     # task == 2: add adapters and freeze bert model weights
     elif task == 2:
@@ -101,15 +105,17 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
         model.bert.train_adapter("classification")
         model.classifier.requires_grad = True
         model.to(device)
+        # Define the data loaders
+        train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=8)
     else:
+        # Define the data loaders
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32)
         pass
     
     # Define the optimizer and the loss function
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-
-    # Define the data loaders
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=8)
 
     # Train the model
     #model.train()
@@ -151,6 +157,8 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
     model.eval()
     with torch.no_grad():
         correct = 0
+        correct_top2 = 0
+        correct_top3 = 0
         total = 0
         for sent, label in test_loader:
             # Convert the data to tensor form
@@ -158,12 +166,16 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
             labels = torch.tensor(label).to(device)
             # Compute the predicted labels
             outputs = model(**inputs)
-            predicted_labels = torch.argmax(outputs.logits, axis=1)
+            predicted_labels = torch.argsort(outputs.logits, descending=True)
             # Compute the accuracy
             total += labels.size(0)
-            correct += (predicted_labels == labels).sum().item()
-            print(100*correct/total)
-    print(f'Accuracy on the test set: {100 * correct / total:.2f}%')
+            correct += (predicted_labels[:, 0] == labels).sum().item()
+            correct_top2 += ((predicted_labels[:, 0] == labels) | (predicted_labels[:, 1] == labels)).sum().item()
+            correct_top3 += ((predicted_labels[:, 0] == labels) | (predicted_labels[:, 1] == labels) | (predicted_labels[:, 2] == labels)).sum().item()
+            #print(100*correct/total)
+            print(f"Top-1 Accuracy: {100*correct/total:.2f}%, Top-2 Accuracy: {100*correct_top2/total:.2f}%, Top-3 Accuracy: {100*correct_top3/total:.2f}%")
+    #print(f'Accuracy on the test set: {100 * correct / total:.2f}%')
+    print(f'Accuracy on the test set: Top-1: {100 * correct / total:.2f}%, Top-2: {100 * correct_top2 / total:.2f}%, Top-3: {100 * correct_top3 / total:.2f}%')
 
 
 def main():
@@ -192,6 +204,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# task = 0: finetuning bertmodel and training classification layer
+# task = 1: only training classification layer (freeze bert)
+# task = 2: implement and train adapter weights, freeze bert weights and train classification layer
 
 """
 |Training samples | Test samples | Time | Accuracy | Freeze |
