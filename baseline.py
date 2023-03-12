@@ -18,7 +18,7 @@ class RiksdagenDataset(Dataset):
         self.xs = []
         self.ys = []
         
-        with open(filename) as source_file:
+        with open(filename, encoding='utf-8') as source_file:
             data = json.load(source_file)
             
             for i, idx in enumerate(data): 

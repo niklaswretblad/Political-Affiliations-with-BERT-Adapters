@@ -4,11 +4,7 @@ from bs4 import BeautifulSoup
 
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained('KB/bert-base-swedish-cased')
 folder_path = 'data/all_speeches'
-
-# TODO - Ta bort TALMANNEN tal? 
-
 
 def compile_speeches():
 
@@ -41,7 +37,6 @@ def compile_speeches():
             text = text.lower()
             
             ## Tokenizing the text
-            #tokens = tokenizer.tokenize(text)
             tokens = text.split(' ')
         
             ## Cutting the speech of at 512 token length
