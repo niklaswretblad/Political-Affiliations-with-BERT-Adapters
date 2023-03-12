@@ -1,11 +1,42 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import AdapterType, AdapterConfig, AutoConfig, AutoModelWithHeads, AdamW
-
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from transformers import AdapterConfig, BertTokenizer, BertForSequenceClassification
 from torch.utils.data import Dataset
 import json
-#from transformers.adapters import AdapterType, AdapterConfig, AdapterHelper, AdapterTrainer
+from sklearn.model_selection import train_test_split
+import copy
+from datetime import datetime
+
+DATASET = 'RIKSDAGEN'
+#DATASET = 'SNLI'
+
+class RiksdagenDataset(Dataset):
+    
+    def __init__(self, filename, max_size=None):
+        super().__init__()
+        self.vocab_labels = {'KD': 0, 'SD': 1, 'S': 2, 'M': 3, 'V': 4, 'MP': 5, 'L': 6, 'C': 7}
+        self.xs = []
+        self.ys = []
+        
+        with open(filename, encoding="utf-8") as source_file:
+            data = json.load(source_file)
+            
+            for i, idx in enumerate(data): 
+                if max_size and i >= max_size:
+                    break
+                
+                label = data[idx]['label']
+                text = data[idx]['text']
+                if label in self.vocab_labels:
+                    self.xs.append(text)
+                    self.ys.append(self.vocab_labels[label])            
+
+
+    def __getitem__(self, idx):
+        return self.xs[idx], self.ys[idx]
+
+    def __len__(self):
+        return len(self.xs)
 
 class SNLIDataset(Dataset):
 
@@ -38,73 +69,84 @@ class SNLIDataset(Dataset):
     def __len__(self):
         return len(self.xs)
 
-# def add_adapter(model):
-#     config = AdapterConfig.load("pfeiffer")
-#     model.add_adapter("classification", AdapterType.text_task, config=config)
-#     model.train_adapter(["classification"])
-#     return model
-
-def BERT(device, train_dataset, test_dataset, freeze_bert=False):
+def BERT(device, train_dataset, test_dataset, swedish_bert, task):
     # Instantiate the tokenizer and the model
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=41).to(device)
+    if swedish_bert:        
+        tokenizer = BertTokenizer.from_pretrained('KB/bert-base-swedish-cased', model_max_length=512)
+        model = BertForSequenceClassification.from_pretrained('KB/bert-base-swedish-cased', num_labels=len(train_dataset.vocab_labels)).to(device)
+    else:
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(train_dataset.vocab_labels)).to(device)
 
-    # Load the adapter configuration named "pfeiffer" using the 
-    # AdapterConfig.load() method and assign it to a variable called adapter_config.
-    adapter_config = AdapterConfig.load("pfeiffer")
-    # Set the model type to "bert" for the adapter_config 
-    # using the model_type attribute.
-    adapter_config.model_type = "bert"
-    # Set the task name to "classification" for the 
-    # adapter_config using the task_name attribute.
-    adapter_config.task_name = "classification"
-    adapter_config.requires_grad = True
-    # Add a new adapter to the model with the name "classification", using
-    #  the model.add_adapter() method, and configure it with the adapter_config object.
-    model.bert.add_adapter("classification", config=adapter_config)
-    # Train the newly added adapter with the name "classification" 
-    # using the model.train_adapter() method.
-    # This also freezes the model.
-    model.bert.train_adapter("classification")
+    #model.classifier.requires_grad = True # always, kanske är automatiskt men safear
+
+    # task == 1: freeze bert model weights
+    if task == 1:
+        # Freeze all the parameters of the BERT model
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+        model.classifier.requires_grad = True
+
+    # task == 2: add adapters and freeze bert model weights
+    elif task == 2:
+        adapter_config = AdapterConfig.load("pfeiffer")
+        adapter_config.model_type = "bert"
+        adapter_config.task_name = "classification"
+        # Nessesary for updating parameters in adapter
+        #adapter_config.requires_grad = True
+        model.bert.add_adapter("classification", config=adapter_config)
+        # Freeze all the parameters of the BERT model
+        for param in model.bert.parameters():
+            param.requires_grad = False
+        model.bert.train_adapter("classification")
+        model.classifier.requires_grad = True
+        model.to(device)
+    else:
+        pass
     
-    # Unfreeze the classifier
-    model.classifier.requires_grad = True
-
-    model.to(device)
-
-    # optimizer = AdamW([
-    #     {'params': model.get_adapter("classification").parameters(), 'lr': 1e-3},
-    #     {'params': model.classifier.parameters(), 'lr': 1e-3},
-    # ]) 
     # Define the optimizer and the loss function
-    optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-5)
-    adapter_optimizer = torch.optim.AdamW(model.bert.encoder.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     # Define the data loaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=8)
 
     # Train the model
     #model.train()
 
+    train_t1 = datetime.now()
+    
     for epoch in range(1):
-        for batch_idx, (sent, label) in enumerate(train_loader):
-            # Convert the data to tensor form
-            inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
-            labels = torch.tensor(label).to(device)
+        t1 = datetime.now()
 
+        for batch_idx, (sent, label) in enumerate(train_loader):
+            # Convert the data to tensor form    
+            inputs = tokenizer(sent, padding='max_length', truncation=True, max_length = 512, return_tensors='pt').to(device)
+           
+            labels = torch.tensor(label).to(device)
             # Forward pass
             outputs = model(**inputs, labels=labels)
             loss = outputs.loss
             # Backward pass
             optimizer.zero_grad()
-            adapter_optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            adapter_optimizer.step()
-            if batch_idx % 100 == 0:
-                print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}')
+            if batch_idx % 100 == 0 and batch_idx > 0:
+                t2 = datetime.now()
+                print(f'Epoch: {epoch}, Batch index: {batch_idx}, Loss: {loss.item()}, Deltatime: {t2-t1}')
+                t1 = datetime.now()
 
+                # Code for continously evaluating a statement during training
+                #with torch.no_grad():
+                #    sent = "<string>"
+                #    inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
+                #    outputs = model(**inputs)
+                #    predicted_labels = torch.argmax(outputs.logits, axis=1)
+                #    # Print list of logits
+                #    print(outputs.logits.tolist())
+                    
+
+    print(f"Total trainingtime: {datetime.now() - train_t1}")
     # Evaluate the model
     model.eval()
     with torch.no_grad():
@@ -123,12 +165,30 @@ def BERT(device, train_dataset, test_dataset, freeze_bert=False):
             print(100*correct/total)
     print(f'Accuracy on the test set: {100 * correct / total:.2f}%')
 
+
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=50000)
-    test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=2500)
+    #device = torch.device("mps") if torch.backends.mps.is_available() else torch.device('cpu')         
 
-    BERT(device, train_dataset, test_dataset, freeze_bert=True)
+    if DATASET == 'RIKSDAGEN':
+        swedish_bert = True
+        dataset = RiksdagenDataset('preprocessed_speeches.json', max_size=20000)
+        
+        X_train, X_test, Y_train, Y_test = train_test_split(dataset.xs, dataset.ys, test_size = 0.3)
+        
+        train_dataset = copy.deepcopy(dataset)
+        test_dataset = copy.deepcopy(dataset)
+
+        train_dataset.xs = X_train
+        train_dataset.ys = Y_train
+        test_dataset.xs = X_test
+        test_dataset.ys = Y_test
+    else:         
+        swedish_bert = False
+        train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=1000)
+        test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=200)
+    
+    BERT(device, train_dataset, test_dataset, swedish_bert, task=2)
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,22 @@
+{
+  "anforande": {
+    "dok_hangar_id": "5120103",
+    "dok_id": "H90966",
+    "dok_titel": "Protokoll 2021/22:66 Tisdagen den 15 februari",
+    "dok_rm": "2021/22",
+    "dok_nummer": "66",
+    "dok_datum": "2022-02-15 00:00:00",
+    "avsnittsrubrik": "Cybersäkerhetsfrågor",
+    "underrubrik": "",
+    "kammaraktivitet": "",
+    "anforande_id": "0753ade4-36c2-ec11-9167-901b0eac4c78",
+    "anforande_nummer": "38",
+    "talare": "Kalle Olsson (S)",
+    "parti": "S",
+    "anforandetext": "<p>Fru talman! Jag nämnde i mitt anförande inrättandet av Försvarsmaktens centrum för cybersäkerhet och informationssäkerhet, CDIS vid KTH. Det kan man se som ett exempel där staten nu ökar sitt insteg och bygger tätare relationer till akademin. Jag tror att det är helt nödvändigt att vi fortsätter i denna riktning. Här finns också kopplingen till utbildningen av cybersoldater som nu har kommit igång på ett väldigt bra sätt och som ser ut att ge väldigt goda resultat. </p><p>Jag ser framför mig att vi behöver stärka denna del. Staten behöver ta ett ännu tydligare grepp när det gäller forskning och utbildning eftersom detta är ett område där det behöver göras mer. </p><p>När det sedan gäller det här med att kartlägga sårbarheter och brister får man väl ändå säga att vi gör det i dag, på flera olika sätt. Ett exempel är att FRA bedriver en väldigt aktiv verksamhet där de besöker framför allt myndigheter och gör så kallade penetrationstester. Det finns en hög efterfrågan i statsförvaltningen på den typen av tjänster. </p><p>Vi har även systemet med it-incidentrapportering, där jag delar Niels Paarup-Petersens oro kring att rapporteringen inte har nått den nivå vi skulle ha önskat oss. Det finns dock en tydlig instruktion om att så ska ske. Där finns också en potential att utifrån de rapporteringar som kommer in faktiskt dra slutsatser; jag refererade delvis till dem i mitt eget anförande. MSB sammanställer de incidenter som rapporteras in till myndigheten och delger dem sedan offentligt, och där ser man att mänskliga misstag - som jag nämnde - är en av de stora förklaringarna till många av de incidenter som sker. </p>",
+    "intressent_id": "0472349361027",
+    "rel_dok_id": "",
+    "replik": "Y",
+    "systemdatum": "2022-04-22 14:23:22"
+  }
+}

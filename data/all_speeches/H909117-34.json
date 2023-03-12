@@ -1,0 +1,22 @@
+{
+  "anforande": {
+    "dok_hangar_id": "5133599",
+    "dok_id": "H909117",
+    "dok_titel": "Protokoll 2021/22:117 Torsdagen den 19 maj",
+    "dok_rm": "2021/22",
+    "dok_nummer": "117",
+    "dok_datum": "2022-05-19 00:00:00",
+    "avsnittsrubrik": "Frågestund",
+    "underrubrik": "Redundans och säkerhet i bredbandsutbyggnaden",
+    "kammaraktivitet": "frågestund",
+    "anforande_id": "3d2045de-bb39-ed11-9178-901b0e9b71a8",
+    "anforande_nummer": "34",
+    "talare": "Mikael Larsson (C)",
+    "parti": "C",
+    "anforandetext": "<p>Fru talman! Bredbandsutbyggnaden i Sverige är fortsatt väldigt viktig, och det är en fråga för hela landet och inte minst för landsbygden. Vi har sett att pandemin har gjort att digitaliseringen har gått fortare och att vård och omsorg och utbildning nu blir mer vanligt att utöva digitalt.</p><p>Just detta ställer högre krav på säkerhet och redundans i systemet - att systemet inte går ned och att systemet är säkert. Vi ser att det finns olika varianter att bygga ut bredbandet med: fiber, FWA och radiolänklösningar.</p><p>Det är också väldigt oroligt i vår omvärld, som vi alla känner till, och det kan vara ett sätt för att stänga ned att man riktar hot mot vårt digitala liv. Samtidigt vet vi att digitaliseringen för människor närmare varandra.</p><p>Min fråga till statsrådet Farmanbar blir därför: Hur jobbar statsrådet och regeringen med redundans och säkerhet i den fortsatta bredbandsutbyggnaden?</p>",
+    "intressent_id": "0226631365426",
+    "rel_dok_id": "H9C120220519fs",
+    "replik": "N",
+    "systemdatum": "2022-09-21 16:44:57"
+  }
+}
