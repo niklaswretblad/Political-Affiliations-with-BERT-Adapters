@@ -10,10 +10,10 @@ from datetime import datetime
 # task = 0: finetuning bertmodel and training classification layer
 # task = 1: only training classification layer (freeze bert)
 # task = 2: implement and train adapter weights, freeze bert weights and train classification layer
-TASK = 2
+TASK = 1
 
-#DATASET = 'RIKSDAGEN'
-DATASET = 'SNLI'
+DATASET = 'RIKSDAGEN'
+#DATASET = 'SNLI'
 
 class RiksdagenDataset(Dataset):
     
@@ -113,7 +113,7 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
         pass
 
     # Define the optimizer and the loss function
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
@@ -148,18 +148,23 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
                 t1 = datetime.now()
 
     print(f"Total trainingtime: {datetime.now() - train_t1}")
+
     # Evaluate the model
     model.eval()
+
     with torch.no_grad():
         correct = 0
         total = 0
         for idx, (sent, label) in enumerate(test_loader):
+
             # Convert the data to tensor form
             inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
             labels = torch.tensor(label).to(device)
+
             # Compute the predicted labels
             outputs = model(**inputs)
             predicted_labels = torch.argmax(outputs.logits, axis=1)
+
             # Compute the accuracy
             total += labels.size(0)
             correct += (predicted_labels == labels).sum().item()
@@ -171,7 +176,6 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
 
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    #device = torch.device("mps") if torch.backends.mps.is_available() else torch.device('cpu')         
 
     if DATASET == 'RIKSDAGEN':
         swedish_bert = True
@@ -179,6 +183,9 @@ def main():
         
         X_train, X_test, Y_train, Y_test = train_test_split(dataset.xs, dataset.ys, test_size = 0.3)
         
+        print("X_Train len: ", len(X_train))
+        print("X_Test len: ", len(X_test))
+
         train_dataset = copy.deepcopy(dataset)
         test_dataset = copy.deepcopy(dataset)
 
@@ -188,8 +195,20 @@ def main():
         test_dataset.ys = Y_test
     else:         
         swedish_bert = False
-        train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=1000)
-        test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=200)
+        dataset = SNLIDataset('/content/drive/MyDrive/TDDE09/News_Category_Dataset_v3.json', max_size = 52000)
+
+        X_train, X_test, Y_train, Y_test = train_test_split(dataset.xs, dataset.ys, test_size = 0.3)
+        
+        print("X_Train len: ", len(X_train))
+        print("X_Test len: ", len(X_test))
+
+        train_dataset = copy.deepcopy(dataset)
+        test_dataset = copy.deepcopy(dataset)        
+
+        train_dataset.xs = X_train
+        train_dataset.ys = Y_train
+        test_dataset.xs = X_test
+        test_dataset.ys = Y_test
     
     BERT(device, train_dataset, test_dataset, swedish_bert, task=TASK)
 
