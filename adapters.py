@@ -7,8 +7,13 @@ from sklearn.model_selection import train_test_split
 import copy
 from datetime import datetime
 
-DATASET = 'RIKSDAGEN'
-#DATASET = 'SNLI'
+# task = 0: finetuning bertmodel and training classification layer
+# task = 1: only training classification layer (freeze bert)
+# task = 2: implement and train adapter weights, freeze bert weights and train classification layer
+TASK = 2
+
+#DATASET = 'RIKSDAGEN'
+DATASET = 'SNLI'
 
 class RiksdagenDataset(Dataset):
     
@@ -50,7 +55,7 @@ class SNLIDataset(Dataset):
                 'WOMEN': 18, 'MONEY': 19, 'RELIGION': 20, 'LATINO VOICES': 21, 'IMPACT': 22, 'WEDDINGS': 23, 'COLLEGE': 24,
                 'ARTS & CULTURE': 25, 'STYLE': 26, 'GREEN': 27, 'TASTE': 28, 'THE WORLDPOST': 29, 'GOOD NEWS': 30,
                 'WORLDPOST': 31, 'FIFTY': 32, 'ARTS': 33, 'COMEDY': 34, 'SPORTS': 35, 'BLACK VOICES': 36, 'HOME & LIVING': 37, 
-                'PARENTS': 38, 'WORLD NEWS': 39, 'SCIENCE': 40 }
+                'PARENTS': 38, 'WORLD NEWS': 39, 'SCIENCE': 40, 'DIVORCE': 41 }
         
         with open(filename) as source:
             for i, line in enumerate(source):
@@ -75,10 +80,10 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
     # Instantiate the tokenizer and the model
     if swedish_bert:        
         tokenizer = BertTokenizer.from_pretrained('KB/bert-base-swedish-cased', model_max_length=512)
-        model = BertForSequenceClassification.from_pretrained('KB/bert-base-swedish-cased', num_labels=len(train_dataset.vocab_labels)).to(device)
+        model = BertForSequenceClassification.from_pretrained('KB/bert-base-swedish-cased', num_labels=len(train_dataset.vocab_labels))
     else:
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(train_dataset.vocab_labels)).to(device)
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(train_dataset.vocab_labels))
 
     model.classifier.requires_grad = True # always, kanske är automatiskt men safear
 
@@ -90,24 +95,32 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
 
     # task == 2: add adapters and freeze bert model weights
     elif task == 2:
+        print("Running adapter config")
         adapter_config = AdapterConfig.load("pfeiffer")
         adapter_config.model_type = "bert"
         adapter_config.task_name = "classification"
-        # Nessesary for updating parameters in adapter
-        adapter_config.requires_grad = True
+
+        # Nessesary for updating parameters in adapter        
         model.add_adapter("classification", config=adapter_config)
-        model.train_adapter("classification")
+
         # Freeze all the parameters of the BERT model
         for param in model.base_model.parameters():
             param.requires_grad = False
+
+        adapter_config.requires_grad = True
+        model.train_adapter("classification")        
     else:
         pass
+
     # Define the optimizer and the loss function
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
     # Define the data loaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32)
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=16)
+
+    # Put model on GPU in case of GPU training
+    model.to(device)
 
     # Train the model
     model.train()
@@ -140,7 +153,7 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
     with torch.no_grad():
         correct = 0
         total = 0
-        for sent, label in test_loader:
+        for idx, (sent, label) in enumerate(test_loader):
             # Convert the data to tensor form
             inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
             labels = torch.tensor(label).to(device)
@@ -150,7 +163,10 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, task):
             # Compute the accuracy
             total += labels.size(0)
             correct += (predicted_labels == labels).sum().item()
-            print(100*correct/total)
+
+            if idx % 100 == 0:
+                print(f'Test batch: {idx} Accuracy: {100*correct/total}')
+                
     print(f'Accuracy on the test set: {100 * correct / total:.2f}%')
 
 def main():
@@ -175,15 +191,12 @@ def main():
         train_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=1000)
         test_dataset = SNLIDataset('News_Category_Dataset_v3.json', max_size=200)
     
-    BERT(device, train_dataset, test_dataset, swedish_bert, task=0)
+    BERT(device, train_dataset, test_dataset, swedish_bert, task=TASK)
 
 if __name__ == '__main__':
     main()
 
 
-# task = 0: finetuning bertmodel and training classification layer
-# task = 1: only training classification layer (freeze bert)
-# task = 2: implement and train adapter weights, freeze bert weights and train classification layer
 """
 |Training samples | Test samples | Time | Accuracy | Freeze |
 |-----------------------------------------------------------| 
