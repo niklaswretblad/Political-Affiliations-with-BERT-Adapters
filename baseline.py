@@ -4,8 +4,10 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 from torch.utils.data import Dataset
 import json
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
 import copy
 from datetime import datetime
+
 
 DATASET = 'RIKSDAGEN'
 #DATASET = 'SNLI'
@@ -72,8 +74,6 @@ class SNLIDataset(Dataset):
         return len(self.xs)
 
 def BERT(device, train_dataset, test_dataset, swedish_bert, freeze_bert=False):
-    # Instantiate the tokenizer and the model
-
     if swedish_bert:        
         tokenizer = BertTokenizer.from_pretrained('KB/bert-base-swedish-cased', model_max_length=512)
         model = BertForSequenceClassification.from_pretrained('KB/bert-base-swedish-cased', num_labels=len(train_dataset.vocab_labels)).to(device)
@@ -81,24 +81,18 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, freeze_bert=False):
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(train_dataset.vocab_labels)).to(device)
 
-    # Freeze the BERT model if required
     if freeze_bert:
-        # Freeze all the parameters of the BERT model
         for param in model.base_model.parameters():
             param.requires_grad = False
 
-    # Define the optimizer and the loss function
     optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-5)
 
-    # Define the data loaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32)
 
-    # Train the model
     model.train()
-
     train_t1 = datetime.now()
-
+    
     for epoch in range(1):
         t1 = datetime.now()
 
@@ -120,11 +114,13 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, freeze_bert=False):
                 t1 = datetime.now()
 
     print(f"Total trainingtime: {datetime.now() - train_t1}")
+    
     # Evaluate the model
+    true_labels = []
+    predicted_labels_list = []
+    
     model.eval()
     with torch.no_grad():
-        correct = 0
-        total = 0
         for sent, label in test_loader:
             # Convert the data to tensor form
             inputs = tokenizer(sent, padding=True, truncation=True, return_tensors='pt').to(device)
@@ -132,11 +128,13 @@ def BERT(device, train_dataset, test_dataset, swedish_bert, freeze_bert=False):
             # Compute the predicted labels
             outputs = model(**inputs)
             predicted_labels = torch.argmax(outputs.logits, axis=1)
-            # Compute the accuracy
-            total += labels.size(0)
-            correct += (predicted_labels == labels).sum().item()
-            print(100*correct/total)
-    print(f'Accuracy on the test set: {100 * correct / total:.2f}%')
+            # Append to the lists
+            true_labels.extend(label)
+            predicted_labels_list.extend(predicted_labels.cpu().numpy())
+
+    print(f'Accuracy on the test set: {accuracy_score(true_labels, predicted_labels_list):.2f}%')
+    print(classification_report(true_labels, predicted_labels_list, target_names=list(train_dataset.vocab_labels.keys())))
+
 
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -164,14 +162,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-"""
-|Training samples | Test samples | Time | Accuracy | Freeze |
-|-----------------------------------------------------------| 
-|    2000         |  500         |   ?  |  43.80%  | False  |
-|    10 000       |  2000        |   ?  |  66.50%  | False  |
-|    10 000       |  2000        |   ?  |  25.50%  | True   |
-|    50 000       |  5000        |   ?  |  38.04%  | True   |
-"""
